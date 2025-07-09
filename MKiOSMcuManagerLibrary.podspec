@@ -25,4 +25,6 @@ TODO: Add long description of the pod here.
 
   s.source_files = 'MKiOSMcuManagerLibrary/**'
   
+  s.dependency 'iOSMcuManagerLibrary'
+  
 end
