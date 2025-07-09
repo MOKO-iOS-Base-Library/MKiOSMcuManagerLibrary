@@ -18,5 +18,4 @@ Pod::Spec.new do |s|
   s.source_files = "Sources/**/*.{swift, h}"
   
   s.dependency 'iOSMcuManagerLibrary'
-  s.dependency 'CoreBluetooth'  # 可能需要添加这个依赖
 end
