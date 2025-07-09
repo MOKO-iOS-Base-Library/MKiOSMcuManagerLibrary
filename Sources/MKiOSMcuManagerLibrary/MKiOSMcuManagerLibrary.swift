@@ -11,9 +11,6 @@ import iOSMcuManagerLibrary
     enum MKiOSDFUError: Error {
             case cancel
             case connectionFailed
-            case invalidHallSensorData
-            case invalidResetButtonData
-            case invalidSensorData
             
             var errorDescription: String? {
                 switch self {
@@ -21,12 +18,6 @@ import iOSMcuManagerLibrary
                     return "Upgrade has been canceled."
                 case .connectionFailed:
                     return "Connect Failed"
-                case .invalidHallSensorData:
-                    return "Hall Sensor Error"
-                case .invalidResetButtonData:
-                    return "Reset By Button Error"
-                case .invalidSensorData:
-                    return "Sensor Type Error"
                 }
             }
     }
