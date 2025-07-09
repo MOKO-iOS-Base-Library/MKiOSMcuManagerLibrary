@@ -23,7 +23,7 @@ TODO: Add long description of the pod here.
 
   s.ios.deployment_target = '14.0'
 
-  s.source_files = 'MKiOSMcuManagerLibrary/**'
+  s.source_files = "Sources/**/*.{swift, h}"
   
   s.dependency 'iOSMcuManagerLibrary'
   
