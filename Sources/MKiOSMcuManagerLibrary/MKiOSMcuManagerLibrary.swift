@@ -24,8 +24,8 @@ import iOSMcuManagerLibrary
     
     @objc public init(peripheral: CBPeripheral) {
         super.init()
-        let transporter = McuMgrBleTransport(peripheral)
-        dfuManager = FirmwareUpgradeManager(transporter: transporter, delegate: self)
+        let transport = McuMgrBleTransport(peripheral)
+        dfuManager = FirmwareUpgradeManager(transporter: transport, delegate: self)
     }
     
     @objc public func updateWithFileUrl(_ url: String,
@@ -46,7 +46,7 @@ import iOSMcuManagerLibrary
         do {
             // 使用正确的类型 McuMgrPackage
             let package = try Data(contentsOf: fileUrl)
-            try dfuManager?.start(data: package)  // 正确调用start方法
+            try dfuManager?.start(data: package, using: FirmwareUpgradeConfiguration())  // 正确调用start方法
         } catch {
             failedBlock(error as NSError)
         }
