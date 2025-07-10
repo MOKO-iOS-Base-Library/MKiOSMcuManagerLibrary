@@ -22,36 +22,82 @@ import iOSMcuManagerLibrary
                            success: @escaping () -> Void,
                            failure: @escaping (Error) -> Void) {
         
-        guard let fileURL = URL(string: url) else {
-            failure(NSError(domain: "FirmwareUpdateWrapper",
-                          code: -1,
-                          userInfo: [NSLocalizedDescriptionKey: "Invalid file URL"]))
-            return
-        }
-        
-        self.progressHandler = progress
-        self.successHandler = success
-        self.failureHandler = failure
-        
-        do {
-            let package = try McuMgrPackage(from: fileURL)
-            let configuration = FirmwareUpgradeConfiguration(
-                estimatedSwapTime: 10.0,
-                eraseAppSettings: false,
-                pipelineDepth: 2,
-                byteAlignment: .disabled,
-                reassemblyBufferSize: 1024,
-                upgradeMode: .testAndConfirm
-            )
-            
-            try? dfuManager?.start(package: package, using: configuration)
-        } catch {
-            failure(error)
+        // 确保在主线程执行
+        DispatchQueue.main.async {
+            do {
+                // 1. 验证并转换URL
+                let fileURL = try self.validateAndCreateFileURL(url)
+                
+                // 2. 验证文件存在
+                try self.validateFileExistence(at: fileURL)
+                
+                // 3. 设置回调
+                self.progressHandler = progress
+                self.successHandler = success
+                self.failureHandler = failure
+                
+                // 4. 开始更新
+                try self.startFirmwareUpdate(with: fileURL)
+                
+            } catch {
+                failure(error)
+                self.cleanup()
+            }
         }
     }
     
     @objc public func cancelUpdate() {
         dfuManager?.cancel()
+    }
+    
+    // MARK: - Private Methods
+    
+    private func validateAndCreateFileURL(_ urlString: String) throws -> URL {
+        // 先尝试直接转换
+        if let fileURL = URL(string: urlString), fileURL.isFileURL {
+            return fileURL
+        }
+        
+        // 如果不是fileURL，尝试处理沙盒路径
+        if let documentsDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {
+            let fileName = (urlString as NSString).lastPathComponent
+            let fileURL = documentsDir.appendingPathComponent(fileName)
+            if fileURL.isFileURL {
+                return fileURL
+            }
+        }
+        
+        throw NSError(domain: "FirmwareUpdateWrapper",
+                      code: -1,
+                      userInfo: [NSLocalizedDescriptionKey: "Invalid file URL: \(urlString)"])
+    }
+    
+    private func validateFileExistence(at url: URL) throws {
+        guard FileManager.default.fileExists(atPath: url.path) else {
+            throw NSError(domain: "FirmwareUpdateWrapper",
+                          code: -2,
+                          userInfo: [NSLocalizedDescriptionKey: "File not found at path: \(url.path)"])
+        }
+    }
+    
+    private func startFirmwareUpdate(with fileURL: URL) throws {
+        let package = try McuMgrPackage(from: fileURL)
+        let configuration = FirmwareUpgradeConfiguration(
+            estimatedSwapTime: 10.0,
+            eraseAppSettings: false,
+            pipelineDepth: 2,
+            byteAlignment: .disabled,
+            reassemblyBufferSize: 1024,
+            upgradeMode: .testAndConfirm
+        )
+        
+        try dfuManager?.start(package: package, using: configuration)
+    }
+    
+    private func cleanup() {
+        progressHandler = nil
+        successHandler = nil
+        failureHandler = nil
     }
 }
 
@@ -64,13 +110,11 @@ extension FirmwareUpdateWrapper: FirmwareUpgradeDelegate {
     }
     
     public func upgradeDidStart(controller: FirmwareUpgradeController) {
-        // 升级开始
-        print("Start upgrade")
+        print("Firmware upgrade started")
     }
     
     public func upgradeStateDidChange(from previousState: FirmwareUpgradeState, to newState: FirmwareUpgradeState) {
-        // 状态变化
-        print("Current upgrade state:",newState)
+        print("Upgrade state changed from \(previousState) to \(newState)")
     }
     
     public func upgradeDidComplete() {
@@ -89,17 +133,11 @@ extension FirmwareUpdateWrapper: FirmwareUpgradeDelegate {
     
     public func upgradeDidCancel(state: FirmwareUpgradeState) {
         let error = NSError(domain: "FirmwareUpdateWrapper",
-                          code: -2,
+                          code: -3,
                           userInfo: [NSLocalizedDescriptionKey: "Update cancelled by user"])
         DispatchQueue.main.async {
             self.failureHandler?(error)
             self.cleanup()
         }
-    }
-    
-    private func cleanup() {
-        progressHandler = nil
-        successHandler = nil
-        failureHandler = nil
     }
 }
