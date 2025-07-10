@@ -1,6 +1,6 @@
 Pod::Spec.new do |s|
   s.name             = 'MKiOSMcuManagerLibrary'
-  s.version          = '0.0.3'
+  s.version          = '0.0.4'
   s.summary          = 'iOS Mcu upgrade component library of MOKO.'
 
   s.description      = <<-DESC
