@@ -2,80 +2,104 @@ import Foundation
 import CoreBluetooth
 import iOSMcuManagerLibrary
 
-@objc public class MKiOSDFUManager: NSObject {
+@objc public class FirmwareUpdateWrapper: NSObject {
     private var dfuManager: FirmwareUpgradeManager?
+    private var transport: McuMgrBleTransport?
+    
+    // 回调属性
     private var progressHandler: ((CGFloat) -> Void)?
     private var successHandler: (() -> Void)?
-    private var failureHandler: ((NSError) -> Void)?
-    
-    enum MKiOSDFUError: Error {
-            case cancel
-            case connectionFailed
-            
-            var errorDescription: String? {
-                switch self {
-                case .cancel:
-                    return "Upgrade has been canceled."
-                case .connectionFailed:
-                    return "Connect Failed"
-                }
-            }
-    }
+    private var failureHandler: ((Error) -> Void)?
     
     @objc public init(peripheral: CBPeripheral) {
         super.init()
-        dfuManager = FirmwareUpgradeManager(transporter: McuMgrBleTransport(peripheral), delegate: self)
+        self.transport = McuMgrBleTransport(peripheral)
+        self.dfuManager = FirmwareUpgradeManager(transport: transport!, delegate: self)
     }
     
-    @objc public func updateWithFileUrl(_ url: String,
-                                progressBlock: @escaping (CGFloat) -> Void,
-                                sucBlock: @escaping () -> Void,
-                                failedBlock: @escaping (NSError) -> Void) {
-        // 存储回调
-        self.progressHandler = progressBlock
-        self.successHandler = sucBlock
-        self.failureHandler = failedBlock
+    @objc public func update(withFileUrl url: String,
+                           progress: @escaping (CGFloat) -> Void,
+                           success: @escaping () -> Void,
+                           failure: @escaping (Error) -> Void) {
         
-        guard let fileUrl = URL(string: url) else {
-            failedBlock(NSError(domain: "MKiOSDFUManager", code: -1,
-                             userInfo: [NSLocalizedDescriptionKey: "无效文件URL"]))
+        guard let fileURL = URL(string: url) else {
+            failure(NSError(domain: "FirmwareUpdateWrapper",
+                          code: -1,
+                          userInfo: [NSLocalizedDescriptionKey: "Invalid file URL"]))
             return
         }
         
+        self.progressHandler = progress
+        self.successHandler = success
+        self.failureHandler = failure
+        
         do {
-            // 使用正确的类型 McuMgrPackage
-            let package = try Data(contentsOf: fileUrl)
-            try dfuManager?.start(images: [(0, package)])
+            let package = try McuMgrPackage(from: fileURL)
+            let configuration = FirmwareUpgradeConfiguration(
+                estimatedSwapTime: 10.0,
+                eraseAppSettings: false,
+                pipelineDepth: 2,
+                byteAlignment: .disabled,
+                reassemblyBufferSize: 1024,
+                upgradeMode: .testAndConfirm
+            )
+            
+            try? dfuManager?.start(package: package, using: configuration)
         } catch {
-            failedBlock(error as NSError)
+            failure(error)
         }
+    }
+    
+    @objc public func cancelUpdate() {
+        dfuManager?.cancel()
     }
 }
 
-// MARK: - FirmwareUpgradeDelegate
-extension MKiOSDFUManager: FirmwareUpgradeDelegate {
-    public func upgradeDidComplete() {
-        successHandler?()
-    }
-    
-    public func upgradeDidFail(inState state: iOSMcuManagerLibrary.FirmwareUpgradeState, with error: any Error) {
-        failureHandler?(error as NSError)
-    }
-    
-    public func upgradeDidCancel(state: iOSMcuManagerLibrary.FirmwareUpgradeState) {
-        failureHandler?(MKiOSDFUError.cancel as NSError)
-    }
-    
+extension FirmwareUpdateWrapper: FirmwareUpgradeDelegate {
     public func uploadProgressDidChange(bytesSent: Int, imageSize: Int, timestamp: Date) {
         let progress = CGFloat(bytesSent) / CGFloat(imageSize)
-        self.progressHandler?(progress)
+        DispatchQueue.main.async {
+            self.progressHandler?(progress)
+        }
     }
     
     public func upgradeDidStart(controller: FirmwareUpgradeController) {
-        print("DFU开始")
+        // 升级开始
+        print("Start upgrade")
     }
     
     public func upgradeStateDidChange(from previousState: FirmwareUpgradeState, to newState: FirmwareUpgradeState) {
-        
+        // 状态变化
+        print("Current upgrade state:",newState)
+    }
+    
+    public func upgradeDidComplete() {
+        DispatchQueue.main.async {
+            self.successHandler?()
+            self.cleanup()
+        }
+    }
+    
+    public func upgradeDidFail(inState state: FirmwareUpgradeState, with error: Error) {
+        DispatchQueue.main.async {
+            self.failureHandler?(error)
+            self.cleanup()
+        }
+    }
+    
+    public func upgradeDidCancel(state: FirmwareUpgradeState) {
+        let error = NSError(domain: "FirmwareUpdateWrapper",
+                          code: -2,
+                          userInfo: [NSLocalizedDescriptionKey: "Update cancelled by user"])
+        DispatchQueue.main.async {
+            self.failureHandler?(error)
+            self.cleanup()
+        }
+    }
+    
+    private func cleanup() {
+        progressHandler = nil
+        successHandler = nil
+        failureHandler = nil
     }
 }

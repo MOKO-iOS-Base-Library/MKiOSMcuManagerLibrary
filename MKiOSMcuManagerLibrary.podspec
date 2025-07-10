@@ -1,6 +1,6 @@
 Pod::Spec.new do |s|
   s.name             = 'MKiOSMcuManagerLibrary'
-  s.version          = '0.0.2'
+  s.version          = '0.0.1'
   s.summary          = 'iOS Mcu upgrade component library of MOKO.'
 
   s.description      = <<-DESC
@@ -13,7 +13,6 @@ Pod::Spec.new do |s|
   s.source           = { :git => 'https://github.com/MOKO-iOS-Base-Library/MKiOSMcuManagerLibrary.git', :tag => s.version.to_s }
   
   s.ios.deployment_target = '14.0'
-  s.swift_version = '5.0'  # 添加这行指定 Swift 版本
   
   s.source_files = "Sources/**/*.{swift, h}"
   

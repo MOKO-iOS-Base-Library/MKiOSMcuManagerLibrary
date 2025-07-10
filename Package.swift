@@ -1,10 +1,10 @@
-// swift-tools-version: 6.0
+// swift-tools-version:5.7
 import PackageDescription
 
 let package = Package(
     name: "MKiOSMcuManagerLibrary",
     platforms: [
-        .iOS(.v14),
+        .iOS(.v14)
     ],
     products: [
         .library(
@@ -13,31 +13,24 @@ let package = Package(
             targets: ["MKiOSMcuManagerLibrary"]),
     ],
     dependencies: [
-        .package(
-            url: "https://github.com/NordicSemiconductor/IOS-nRF-Connect-Device-Manager.git",
-            exact: "1.3.1"  // Using exact version for stability
-        ),
+        .package(url: "https://github.com/NordicSemiconductor/IOS-nRF-Connect-Device-Manager.git", exact: "1.9.2"),
     ],
     targets: [
         .target(
             name: "MKiOSMcuManagerLibrary",
             dependencies: [
-                .product(
-                    name: "iOSMcuManagerLibrary",
-                    package: "IOS-nRF-Connect-Device-Manager"
-                )
+                .product(name: "iOSMcuManagerLibrary", package: "IOS-nRF-Connect-Device-Manager")
             ],
             path: "Sources",
             swiftSettings: [
                 .define("DEBUG", .when(configuration: .debug)),
-                .define("IOS14_OR_LATER")
-            ], linkerSettings: [
-                .linkedFramework("CoreBluetooth"),
-                .linkedFramework("Combine")
+                .define("IOS14_OR_LATER")  // 添加编译标志
             ]
         ),
         .testTarget(
             name: "MKiOSMcuManagerLibraryTests",
-            dependencies: ["MKiOSMcuManagerLibrary"])
+            dependencies: ["MKiOSMcuManagerLibrary"],
+            path: "Tests"
+        )
     ]
 )
